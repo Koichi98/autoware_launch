@@ -12,14 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import GroupAction
+from launch.actions import OpaqueFunction
+from launch.actions import SetEnvironmentVariable
 from launch.actions import SetLaunchConfiguration
 from launch.conditions import IfCondition
 from launch.conditions import UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+
+
+def launch_setup(context, *args, **kwargs):
+    # Check ENABLE_AGNOCAST environment variable
+    use_agnocast = os.getenv("ENABLE_AGNOCAST", "0") == "1"
+    agnocast_heaphook_path = "/opt/ros/humble/lib/libagnocast_heaphook.so"
+    agnocast_mempool_size = LaunchConfiguration("agnocast_mempool_size").perform(context)
+
+    glog_component = ComposableNode(
+        package="autoware_glog_component",
+        plugin="autoware::glog_component::GlogComponent",
+        name="glog_component",
+        namespace="pointcloud_container",
+    )
+
+    container_package = "rclcpp_components"
+
+    pointcloud_container = ComposableNodeContainer(
+        name=LaunchConfiguration("container_name"),
+        namespace="/",
+        package=container_package,
+        executable=LaunchConfiguration("container_executable"),
+        composable_node_descriptions=[glog_component],
+        output="both",
+    )
+
+    actions = (
+        []
+        if not use_agnocast
+        else [
+            SetEnvironmentVariable(
+                name="LD_PRELOAD", value=f"{agnocast_heaphook_path}:{os.getenv('LD_PRELOAD', '')}"
+            ),
+            SetEnvironmentVariable(name="AGNOCAST_MEMPOOL_SIZE", value=agnocast_mempool_size),
+        ]
+    )
+    actions.append(pointcloud_container)
+
+    return [GroupAction(actions=actions)]
 
 
 def generate_launch_description():
@@ -38,28 +82,13 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_multithread")),
     )
 
-    glog_component = ComposableNode(
-        package="autoware_glog_component",
-        plugin="autoware::glog_component::GlogComponent",
-        name="glog_component",
-        namespace="pointcloud_container",
-    )
-
-    pointcloud_container = ComposableNodeContainer(
-        name=LaunchConfiguration("container_name"),
-        namespace="/",
-        package="rclcpp_components",
-        executable=LaunchConfiguration("container_executable"),
-        composable_node_descriptions=[glog_component],
-        output="both",
-    )
-
     return LaunchDescription(
         [
+            add_launch_arg("agnocast_mempool_size", "8589934592"),  # Default: 8GB
             add_launch_arg("use_multithread", "false"),
             add_launch_arg("container_name", "pointcloud_container"),
             set_container_executable,
             set_container_mt_executable,
-            pointcloud_container,
+            OpaqueFunction(function=launch_setup),
         ]
     )
