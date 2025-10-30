@@ -28,9 +28,10 @@ from launch_ros.descriptions import ComposableNode
 
 
 def launch_setup(context, *args, **kwargs):
-    agnocast_heaphook_path = LaunchConfiguration("agnocast_heaphook_path").perform(context)
-    use_agnocast_str = LaunchConfiguration("use_agnocast").perform(context)
-    use_agnocast = use_agnocast_str.lower() == "true"
+    # Check ENABLE_AGNOCAST environment variable
+    use_agnocast = os.getenv("ENABLE_AGNOCAST", "0") == "1"
+    agnocast_heaphook_path = "/opt/ros/humble/lib/libagnocast_heaphook.so"
+    agnocast_mempool_size = LaunchConfiguration("agnocast_mempool_size").perform(context)
 
     glog_component = ComposableNode(
         package="autoware_glog_component",
@@ -57,7 +58,7 @@ def launch_setup(context, *args, **kwargs):
             SetEnvironmentVariable(
                 name="LD_PRELOAD", value=f"{agnocast_heaphook_path}:{os.getenv('LD_PRELOAD', '')}"
             ),
-            SetEnvironmentVariable(name="AGNOCAST_MEMPOOL_SIZE", value="8589934592"),  # 8GB
+            SetEnvironmentVariable(name="AGNOCAST_MEMPOOL_SIZE", value=agnocast_mempool_size),
         ]
     )
     actions.append(pointcloud_container)
@@ -83,8 +84,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            add_launch_arg("agnocast_heaphook_path"),
-            add_launch_arg("use_agnocast", "false"),
+            add_launch_arg("agnocast_mempool_size", "8589934592"),  # Default: 8GB
             add_launch_arg("use_multithread", "false"),
             add_launch_arg("container_name", "pointcloud_container"),
             set_container_executable,

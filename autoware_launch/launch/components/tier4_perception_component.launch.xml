@@ -9,15 +9,9 @@
   <arg name="use_sim_time" default="false"/>
   <arg name="vehicle_model" default="sample_vehicle"/>
 
-  <!-- Agnocast -->
-  <arg name="use_agnocast" default="false" description="enable Agnocast for planning containers"/>
-  <arg name="agnocast_heaphook_path" description="path to agnocast heaphook library"/>
-
   <!-- Pointcloud container -->
   <group if="$(var launch_pointcloud_container)">
     <include file="$(find-pkg-share autoware_launch)/launch/pointcloud_container.launch.py">
-      <arg name="use_agnocast" value="$(var use_agnocast)"/>
-      <arg name="agnocast_heaphook_path" value="$(var agnocast_heaphook_path)"/>
       <arg name="use_multithread" value="true"/>
       <arg name="container_name" value="$(var pointcloud_container_name)"/>
     </include>
@@ -67,8 +61,6 @@
   />
 
   <include file="$(find-pkg-share tier4_perception_launch)/launch/perception.launch.xml">
-    <arg name="use_agnocast" value="$(var use_agnocast)"/>
-    <arg name="agnocast_heaphook_path" value="$(var agnocast_heaphook_path)"/>
     <arg name="data_path" value="$(var data_path)"/>
     <!-- general options to switch launch function/module -->
     <arg name="mode" value="$(var perception_mode)"/>
